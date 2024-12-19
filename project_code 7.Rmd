@@ -1,0 +1,644 @@
+---
+title: "Final_Project"
+date: "2024-11-03"
+output: pdf_document
+---
+
+# Loading in the data 
+
+```{r}
+data = read.csv('project_data/StudentPerformanceFactors.csv')
+summary(data)
+```
+# Data Preprocessing
+
+
+## Indentifying and removing rows with missing values
+
+```{r}
+cat("Number of rows with missing data: ", length(data[data == ""]))
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+
+data[data == ""] <- NA 
+
+# Calculate the percentage of missing data for each column
+missing_percentage <- round(colSums(is.na(data)) / nrow(data) * 100, 2)
+missing_percentage <- missing_percentage[missing_percentage > 0]  # Filter columns with missing data
+
+# Convert to a data frame for plotting
+missing_df <- data.frame(
+  column = names(missing_percentage),
+  percentage = missing_percentage
+)
+
+missing_df
+
+```
+
+```{r}
+# Create the bar graph
+ggplot(missing_df, aes(x = reorder(column, -percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "red") +
+  labs(
+    title = "Percentage of Missing Data by Column",
+    x = "Columns",
+    y = "Percentage of Missing Data"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels
+```
+
+
+```{r}
+# set empty rows to NA values and omit them from the dataset
+data <- na.omit(data)
+```
+
+
+## Converting categorical variables to factor data type
+
+```{r}
+library(dplyr)
+library(caret)
+
+
+# Convert categorical features to factors first
+categorical_features <- c("Parental_Involvement", "Access_to_Resources", 
+                          "Extracurricular_Activities", "Motivation_Level",
+                          "Internet_Access", "Family_Income", "Teacher_Quality", "School_Type", "Peer_Influence", "Learning_Disabilities", "Parental_Education_Level", "Distance_from_Home", "Gender")
+
+data[categorical_features] <- lapply(data[categorical_features], as.factor)
+
+```
+
+
+# Exploratory Data Analysis
+
+```{r}
+# Cross-tabulations for categorical variables
+table(data$Parental_Involvement, data$Motivation_Level)
+prop.table(table(data$School_Type, data$Learning_Disabilities))
+```
+```{r}
+# Histogram of Exam Scores
+ggplot(data, aes(x = Exam_Score)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Exam Scores",
+       x = "Exam Score",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+```{r}
+# Box plot of Exam Scores
+ggplot(data, aes(y = Exam_Score)) +
+  geom_boxplot(fill = "coral") +
+  labs(title = "Box Plot of Exam Scores",
+       y = "Exam Score") +
+  theme_minimal()
+
+```
+
+```{r}
+library(ggplot2)
+library(GGally)
+library(dplyr)
+
+# List of numeric variables to plot
+numeric_vars <- data %>% select_if(is.numeric)
+
+# Create histograms
+for (var in names(numeric_vars)) {
+  print(ggplot(data, aes_string(x = var)) +
+          geom_histogram(binwidth = 5, fill = "blue", alpha = 0.7) +
+          labs(title = paste("Distribution of", var), x = var, y = "Frequency") +
+          theme_minimal())
+}
+
+
+
+```
+
+
+```{r}
+# Scatter Plot: Hours Studied vs Exam Score
+ggplot(data, aes(x = Hours_Studied, y = Exam_Score)) +
+  geom_point(color = "darkgreen") +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Optional linear trend line
+  labs(title = "Hours Studied vs Exam Score",
+       x = "Hours Studied",
+       y = "Exam Score") +
+  theme_minimal()
+
+```
+
+
+```{r}
+#Here, Low range [0-70), Medium range[70-84) and High range[85-10]
+temp_data = data
+temp_data$attendance_bin <- cut(data$Attendance,
+                           breaks = c(0, 70, 85, 100),
+                           labels = c("Low", "Medium", "High"),
+                           right = TRUE)
+
+```
+
+```{r}
+attendance_scores_binned <- temp_data %>%
+  group_by(attendance_bin) %>%
+  summarize(mean_exam_score = mean(Exam_Score, na.rm = TRUE))
+
+```
+
+```{r}
+sum(is.na(temp_data))
+```
+
+```{r}
+# Bar plot for attendance bins with legend
+ggplot(attendance_scores_binned, 
+       aes(x = attendance_bin, y = mean_exam_score, fill = attendance_bin)) +
+  geom_bar(stat = "identity", 
+           color = "black", 
+           width = 0.7) +
+  scale_fill_manual(values = c("Low" = "#9ecae1", 
+                                "Medium" = "#6baed6", 
+                                "High" = "#2171b5"),
+                    name = "Attendance Levels",
+                    labels = c("Low (60-70%)", "Medium (70-85%)", "High (85-100%)")) +
+  labs(title = "Average Exam Score by Attendance Level",
+       x = "Attendance Level",
+       y = "Average Exam Score") +
+  geom_text(aes(label = round(mean_exam_score, 2)), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.5,
+            fontface = "bold") +
+  theme_minimal() +
+  theme(legend.position = "right",
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.title = element_text(face = "bold")) +
+  coord_cartesian(ylim = c(0, max(attendance_scores_binned$mean_exam_score) * 1.1))
+```
+
+```{r}
+# Scatter plot faceted by school type to show teacher quality impact
+ggplot(data = data, 
+       aes(x = Teacher_Quality, y = Exam_Score)) +
+  geom_jitter(width = 0.3, alpha = 0.6, color = "purple") +
+  geom_smooth(method = "lm", color = "darkred", se = FALSE) +
+  labs(title = "Impact of Teacher Quality on Exam Scores by School Type",
+       x = "Teacher Quality",
+       y = "Exam Score") +
+  facet_wrap(~ School_Type) +
+  theme_minimal()
+
+```
+```{r}
+# Box plot of Motivation Level vs. Exam Score
+ggplot(data, aes(x = factor(Motivation_Level), y = Exam_Score)) +
+  geom_boxplot(fill = "lightblue", outlier.color = "red", outlier.shape = 16, outlier.size = 2) +  # Boxplot with outliers
+  labs(title = "Exam Scores by Motivation Level",
+       x = "Motivation Level",
+       y = "Exam Score") +
+  theme_minimal()
+```
+
+```{r}
+
+# List of categorical variables
+categorical_vars <- data %>% select_if(is.factor)
+
+# Loop through each categorical variable and create a bar plot
+for (var in colnames(categorical_vars)) {
+  print(
+    ggplot(data, aes_string(x = var)) +
+      geom_bar(fill = "steelblue", color = "black", alpha = 0.7) +
+      labs(title = paste("Distribution of", var), x = var, y = "Count") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels for readability
+  )
+}
+
+
+```
+
+```{r}
+# For the first table (Contingency Table)
+cat("\nContingency Table: Number of Students by Parental Involvement and Motivation Level\n")
+cat("\nRows: Parental Involvement Levels")
+cat("\nColumns: Motivation Levels\n\n")
+
+parental_motivation_table <- table(data$Parental_Involvement, data$Motivation_Level)
+print(parental_motivation_table)
+
+# For the second table (Proportional Table)
+cat("\nProportional Table: Percentage Distribution of Students\n")
+cat("Rows: School Types")
+cat("\nColumns: Learning Disabilities Status (Values in %)\n\n")
+
+# Calculate proportions and convert to percentages
+school_disability_prop <- prop.table(table(data$School_Type, data$Learning_Disabilities)) * 100
+# Round to 2 decimal places
+school_disability_prop <- round(school_disability_prop, 2)
+print(school_disability_prop)
+```
+
+```{r}
+# Install and load required packages if not already installed
+if (!require(ggplot2)) install.packages("ggplot2")
+if (!require(reshape2)) install.packages("reshape2")
+library(ggplot2)
+library(reshape2)
+
+# Select the variables we want to correlate
+variables <- c("Hours_Studied", "Attendance", "Previous_Scores", "Exam_Score")
+cor_data <- data[, variables]
+
+# Calculate correlation matrix
+cor_matrix <- round(cor(cor_data), 2)
+
+# Convert correlation matrix to long format for ggplot
+cor_melted <- melt(cor_matrix)
+
+# Create the heatmap
+ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                      midpoint = 0, limit = c(-1,1), name = "Correlation") +
+  geom_text(aes(label = value), color = "black", size = 4) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = "right") +
+  ggtitle("Correlation Heatmap of Academic Performance Metrics")
+```
+```{r}
+# Summarize data by extracurricular and physical activity, taking mean of exam_score
+heatmap_data <- data %>%
+  group_by(Extracurricular_Activities, Physical_Activity) %>%
+  summarize(mean_exam_score = mean(Exam_Score, na.rm = TRUE))
+
+# Plot heatmap
+ggplot(heatmap_data, aes(x = Extracurricular_Activities, y = Physical_Activity, fill = mean_exam_score)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Impact of Extracurricular Activities and Physical Activity on Exam Scores",
+       x = "Extracurricular Activities Level",
+       y = "Physical Activity Level",
+       fill = "Avg Exam Score") +
+  theme_minimal()
+```
+
+
+
+```{r}
+library(GGally)
+
+# Select only numeric columns from the dataset
+numeric_vars <- data[sapply(data, is.numeric)]
+
+# Create pairwise plots for each numeric variable
+pairs(numeric_vars)
+
+
+```
+
+
+
+
+# Training Phase
+
+## Splitting the data into train and test datasets
+
+```{r}
+# Set a seed for reproducibility
+set.seed(123)
+
+# Create subset of 80% of the data for training
+sample_size <- floor(0.8 * nrow(data))
+
+train_indices <- sample(seq_len(nrow(data)), size = sample_size)
+
+# Subset the data into training and testing sets
+train_data <- data[train_indices, ]
+test_data <- data[-train_indices, ]
+```
+
+```{r}
+sum(is.na(train_data))
+
+```
+
+```{r}
+cat("Size of training data: ", nrow(train_data), "\n")
+cat("Size of test data: ", nrow(test_data), "\n")
+nrow(data) == nrow(train_data) + nrow(test_data)
+```
+
+## Full Model with all the predictors
+
+```{r}
+lmod <-lm(Exam_Score ~ ., data=train_data)
+summary(lmod)
+```
+
+#### Insignifcant Variables to the Response (p-value < 0.05)
+
+Sleep_Hours
+School_TypePublic
+GenderMale
+
+
+## Creating a reduced model based on the p-values
+
+```{r}
+
+reduced_model <- lm(Exam_Score ~ . - Sleep_Hours -School_Type - Gender, data = train_data)
+
+f_test <- anova(reduced_model, lmod)
+print(f_test)
+```
+```{r}
+summary(reduced_model)
+```
+
+
+#### Results
+
+Since the p-value is >= 0.05 we conclude that the additional predictors we can reasonably conclude that removing these variables does not significantly reduce the model's predictive power. Thus, the reduced model (without Sleep_Hours, School_Type, and Gender) may be preferred for simplicity.
+
+
+
+## L1 Regression Model
+
+
+```{r}
+library(glmnet)
+
+x <- model.matrix(Exam_Score ~ . -1, data = train_data)  # `-1` removes the intercept
+y <- train_data$Exam_Score
+
+
+cv_lasso <- cv.glmnet(x, y, alpha = 1, nfolds = 10)
+
+
+best_lambda <- cv_lasso$lambda.min
+cat("\nBest lambda selected by cross-validation:", best_lambda, "\n\n")
+
+
+lasso_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+
+
+print(coef(lasso_model))
+
+```
+
+
+
+## Stepwise Selection Model
+
+```{r}
+library(MASS)
+
+# Fit a full model with all predictors
+full_model <- lm(Exam_Score ~ ., data = train_data)
+
+stepwise_model <- stepAIC(full_model, direction = "both")
+```
+
+
+```{r}
+print(coef(stepwise_model))
+```
+
+
+
+## Model with handpicked predictors
+
+This model is created by hand picking predictors based on factors outlined in previous research.
+
+```{r}
+handpick_model <- lm(Exam_Score ~ Sleep_Hours + Hours_Studied + Attendance + Access_to_Resources + Family_Income, train_data)
+
+summary(handpick_model)
+```
+
+#### Use F-Test to compare model with handpicked predictors with full model as baseline
+
+```{r}
+f_test2 <- anova(handpick_model, lmod)
+print(f_test2)
+```
+F-test shows that other predictors in full model are significant to the response. Thus, it may be necessary to include some other predictors.
+
+
+## Model Comparison
+
+
+#### Comparing models using AIC
+
+
+```{r}
+reduced_rss <- sum(residuals(reduced_model)^2)  
+n <- nrow(train_data)                   
+reduced_k <- length(coef(reduced_model))       
+
+aic_reduced <- n * log(reduced_rss / n) + 2 * reduced_k
+```
+
+
+
+```{r}
+step_rss <- sum(residuals(stepwise_model)^2)
+n <- nrow(train_data)                 
+step_k <- length(coef(stepwise_model))  
+
+aic_stepwise <- n * log(step_rss / n) + 2 * step_k
+```
+
+
+```{r}
+hp_rss <- sum(residuals(handpick_model)^2)  
+n <- nrow(train_data)                   
+hp_k <- length(coef(handpick_model))       
+
+aic_handpick <- n * log(hp_rss / n) + 2 * hp_k
+```
+
+
+```{r}
+lasso_predictions <- predict(lasso_model, newx = x, s = best_lambda)
+lasso_predictions <- as.numeric(lasso_predictions)
+
+rss_lasso <- sum((y - lasso_predictions)^2)
+
+n <- length(y)
+
+p_lasso <- sum(coef(lasso_model, s = best_lambda) != 0) - 1  # Exclude the intercept
+
+aic_lasso <- n * log(rss_lasso / n) + 2 * p_lasso
+
+# Display AIC values for comparison
+cat("AIC for Reduced Model:", aic_reduced, "\n")
+cat("AIC for Stepwise Model:", aic_stepwise, "\n")
+cat("AIC for Lasso Model:", aic_lasso, "\n")
+cat("AIC for Custom Model:", aic_handpick, "\n")
+```
+Based on the AIC for each model, based on these results the Reduced, Stepwise, and Lasso Model have the best balance between goodness of fit and model complexity, as they have low negligible AIC values of 7812.267 and 7814.304.
+
+
+```{r}
+# Adjusted R^2 for the Reduced Model
+adj_r2_reduced <- summary(reduced_model)$adj.r.squared
+
+# Adjusted R^2 for the Stepwise Model
+adj_r2_stepwise <- summary(stepwise_model)$adj.r.squared
+
+# Adjusted R^2 for the Custom Model
+adj_r2_handpick <- summary(handpick_model)$adj.r.squared
+
+# Adjusted R^2 for the Lasso Model
+# Manually calculate adjusted R^2 for Lasso since glmnet does not provide it directly
+lasso_predictions <- as.numeric(predict(lasso_model, newx = x, s = best_lambda))
+rss_lasso <- sum((y - lasso_predictions)^2)  
+tss <- sum((y - mean(y))^2) 
+n <- length(y)
+p_lasso <- sum(coef(lasso_model, s = best_lambda) != 0) - 1  
+r2_lasso <- 1 - (rss_lasso / tss)  
+adj_r2_lasso <- 1 - ((1 - r2_lasso) * (n - 1) / (n - p_lasso - 1))  
+
+
+cat("Adjusted R^2 for Reduced Model:", adj_r2_reduced, "\n")
+cat("Adjusted R^2 for Stepwise Model:", adj_r2_stepwise, "\n")
+cat("Adjusted R^2 for Lasso Model:", adj_r2_lasso, "\n")
+cat("Adjusted R^2 for Custom Model:", adj_r2_handpick, "\n")
+```
+Based on the adjusted $R^2$ values the best model is the reduced model or model created using stepwise selection. However, with the Lasso model having a very close second best adjusted $R^2$ value of 0.7045392.
+
+
+
+#### Final Model
+
+Based on our comparisons the best model with the best balance of predictive power, goodness of fit and interpretability is the Lasso Model
+
+
+
+## Model Diagonstics
+
+```{r}
+plot(lasso_predictions, y,
+     main = "Predicted vs Actual Values",
+     xlab = "Predicted Values",
+     ylab = "Actual Values",
+     pch = 20, col = "blue")
+abline(0, 1, col = "red", lwd = 2, lty = 2)  # Add y=x line for perfect predictions
+
+```
+
+
+```{r}
+residuals <- y - lasso_predictions
+plot(lasso_predictions, residuals,
+     main = "Residuals vs Predicted Values",
+     xlab = "Predicted Values",
+     ylab = "Residuals",
+     pch = 20, col = "blue")
+abline(h = 0, col = "red", lwd = 2, lty = 2)  # Horizontal line at residual = 0
+
+```
+While there are a few outliers, it seems that residuals are mostly centered around 0 and there does not seem to be heteroskedasticity. Thus, linearity, constant variance and independence assumptions hold.
+
+```{r}
+hist(residuals,
+     main = "Histogram of Residuals",
+     xlab = "Residuals",
+     breaks = 20, col = "blue")
+
+```
+
+```{r}
+qqnorm(residuals, main = "Q-Q Plot of Residuals")
+qqline(residuals, col = "red", lwd = 2)
+
+```
+
+While there are a few outliers at the tails of the plot, based on the qqplot and line, it seems that for the most part the residuals are normally distributed. Thus, normality assumption holds.
+
+
+# Final Model Results on Test Set
+
+
+```{r}
+
+x_test <- model.matrix(Exam_Score ~ . - 1, data = test_data)
+
+y_test <- test_data$Exam_Score 
+
+
+lasso_test_preds <- as.numeric(predict(lasso_model, newx = x_test, s = best_lambda))
+
+
+mse_lasso <- mean((y_test - lasso_test_preds)^2)
+
+
+cat("Mean Squared Error (MSE) for Lasso Model on Test Data:", mse_lasso, "\n")
+
+rmse_lasso <- sqrt(mse_lasso)
+cat("Root Mean Squared Error (RMSE):", rmse_lasso, "\n")
+
+```
+This means that, on average, the model’s predictions deviate from the actual Exam_Score by approximately 1.74 percent from values in the test data.
+
+
+## Model Diagnostic on test set
+
+```{r}
+plot(lasso_test_preds, y_test,
+     main = "Predicted vs Actual Values",
+     sub = paste("R² =", round(sqrt(mse_lasso), 3)),
+     xlab = "Predicted Values",
+     ylab = "Actual Values",
+     pch = 20, col = "blue")
+abline(0, 1, col = "red", lwd = 2, lty = 2)  # Add y=x line for perfect predictions
+
+```
+
+
+
+```{r}
+test_residuals <- y_test - lasso_test_preds
+plot(lasso_test_preds, test_residuals,
+     main = "Residuals vs Predicted Values",
+     xlab = "Predicted Values",
+     ylab = "Residuals",
+     pch = 20, col = "blue")
+abline(h = 0, col = "red", lwd = 2, lty = 2)  # Horizontal line at residual = 0
+
+```
+
+```{r}
+hist(test_residuals,
+     main = "Histogram of Residuals",
+     xlab = "Residuals",
+     breaks = 20, col = "blue")
+
+```
+
+```{r}
+qqnorm(test_residuals, main = "Q-Q Plot of Residuals")
+qqline(test_residuals, col = "red", lwd = 2)
+
+```
+
+
+
+
+
+
