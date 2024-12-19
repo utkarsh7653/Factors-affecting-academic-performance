@@ -15,7 +15,7 @@ Reduced Models (using stepwise selection)
 Lasso Regression (selected as the final model)
 Model Evaluation: Compared models using AIC, adjusted R-squared, and RMSE for train-test split data validation.
 
-Key Findings
+Key Findings:
 Attendance and hours studied showed the strongest correlation with exam scores.
 Socio-economic factors such as family income and access to resources significantly impacted performance.
 The Lasso model emerged as the best balance between predictive power, interpretability, and generalization, with an RMSE of ~1.74 on the test set.
