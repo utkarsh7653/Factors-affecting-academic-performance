@@ -1,13 +1,13 @@
 # Factors-affecting-academic-performance
-Objective
+Objective:
 The primary goal of the study was to identify and analyze key contributors to student performance, such as study habits, attendance, socio-economic factors, and other personal and institutional variables. By understanding these relationships, the project aims to provide insights for educators, policymakers, and students to enhance educational outcomes.
 
-Dataset
+Dataset:
 The study utilized a synthetically generated dataset representing real-world scenarios:
 
 Source: Kaggle - Student Performance Factors Dataset
 Key Variables: Exam scores, study hours, attendance, socio-economic indicators, teacher quality, and more.
-Methodology
+Methodology:
 Exploratory Data Analysis (EDA): Unveiled relationships between variables using visualizations and statistical summaries.
 Modeling Techniques:
 Linear Regression
